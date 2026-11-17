@@ -398,7 +398,12 @@ client.once("ready", () => {
 // إدارة AFK
 client.on("voiceStateUpdate", async (oldState, newState) => {
   const member = newState.member || oldState.member;
-
+console.log("[VOICE EVENT]", {
+  member: member?.user?.tag,
+  oldChannel: oldState.channelId,
+  newChannel: newState.channelId,
+  afkChannel: AFK_CHANNEL_ID
+});
   if (!member || member.user.bot) return;
 
   const joinedAFK =
