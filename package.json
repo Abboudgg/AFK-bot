@@ -1,7 +1,7 @@
 {
-  "name": "codeon-afk-bot",
-  "version": "1.0.0",
-  "description": "بوت الغياب AFK ・ Codeon",
+  "name": "cass-afk-bot",
+  "version": "1.1.0",
+  "description": "CASS AFK Discord bot and dashboard",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "discord.js": "^14.16.3",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "express-session": "^1.18.1"
   }
 }
