@@ -161,6 +161,19 @@ function createDashboard(client, db, defaults) {
     }
   }
 
+  app.get('/api/guild/:guildId/channels', requireLogin, authorizeGuild, async (req, res) => {
+    try {
+      const channels = await req.botGuild.channels.fetch();
+      res.json({ channels: [...channels.values()]
+        .filter(c => c && c.isTextBased() && c.guildId === req.params.guildId && typeof c.name === 'string')
+        .map(c => ({ id: c.id, name: c.name }))
+        .sort((a, b) => a.name.localeCompare(b.name, 'ar')) });
+    } catch (error) {
+      console.error('[CASS dashboard channels]', error.message);
+      res.status(502).json({ error: 'تعذر تحميل الرومات.' });
+    }
+  });
+
   app.get('/api/guild/:guildId/settings', requireLogin, authorizeGuild, (req, res) => {
     const data = db.guild(req.params.guildId, defaults);
     res.json({ settings: { nickname: Boolean(data.cfg.nick), ignoredChannels: data.cfg.ignore || [] } });
