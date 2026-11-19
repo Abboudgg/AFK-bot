@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
+  <section class="auth-gate" id="authGate" hidden><div class="auth-card"><div class="brand-mark">C</div><div class="eyebrow">CASS AFK CONTROL</div><h1>أهلاً بك</h1><p>سجّل دخولك بحساب Discord للمتابعة إلى لوحة CASS AFK.</p><a class="login" id="authLogin" href="/auth/discord">تسجيل الدخول عبر Discord</a></div></section>
   <div class="shell">
     <aside class="sidebar">
       <a class="brand" href="#"><span class="brand-mark">C</span><span><b>CASS</b><small>AFK CONTROL</small></span></a>
@@ -24,6 +25,7 @@
       <div class="sidebar-bottom"><span class="status-dot"></span><span>لوحة CASS AFK</span></div>
     </aside>
     <main class="main" id="overview">
+      <section class="account-panel" id="accountPanel"><img id="accountAvatar" alt="صورة حساب Discord"><div><h2 id="accountName">حسابي</h2><p id="accountTag"></p><span id="accountRole"></span></div><button class="login logout" id="accountLogout" type="button">تسجيل الخروج</button></section>
       <header class="topbar"><div><div class="eyebrow">مساحة التحكم</div><h1>نظرة عامة</h1></div><div class="top-actions"><span class="preview-tag">لوحة تحكم</span><a class="login" id="loginButton" href="/auth/discord">تسجيل الدخول بـ Discord</a><button class="login logout" id="logoutButton" type="button" hidden>تسجيل الخروج</button></div></header>
       <section class="welcome"><div><div class="eyebrow">مرحباً بك في CASS</div><h2>خلّ الغياب علينا، وركّز على يومك.</h2><p>تحكّم بإعدادات بوت AFK وتابع نشاطه من مكان واحد.</p></div><div class="orb">C</div></section>
       <section class="section-head"><div><h3>ملخص البوت</h3><p>بيانات مباشرة عند تشغيل البوت وتسجيل الدخول.</p></div><span class="live-pill" id="botStatus"><i></i> جارٍ التحقق...</span></section>
