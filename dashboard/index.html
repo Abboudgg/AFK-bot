@@ -20,15 +20,14 @@
         <a href="#servers"><span>▣</span> السيرفرات</a>
         <a href="#settings"><span>⚙</span> إعدادات AFK</a>
         <a href="#members"><span>♙</span> الأعضاء الغائبون</a>
-        <a href="#mentions"><span>↗</span> سجل المنشنات</a>
       </nav>
-      <div class="sidebar-bottom"><span class="status-dot"></span><span>واجهة أولية قيد التطوير</span></div>
+      <div class="sidebar-bottom"><span class="status-dot"></span><span>لوحة CASS AFK</span></div>
     </aside>
     <main class="main" id="overview">
-      <header class="topbar"><div><div class="eyebrow">مساحة التحكم</div><h1>نظرة عامة</h1></div><div class="top-actions"><span class="preview-tag">معاينة التصميم</span><a class="login" id="loginButton" href="/auth/discord">تسجيل الدخول بـ Discord</a><button class="login logout" id="logoutButton" type="button" hidden>تسجيل الخروج</button></div></header>
+      <header class="topbar"><div><div class="eyebrow">مساحة التحكم</div><h1>نظرة عامة</h1></div><div class="top-actions"><span class="preview-tag">لوحة تحكم</span><a class="login" id="loginButton" href="/auth/discord">تسجيل الدخول بـ Discord</a><button class="login logout" id="logoutButton" type="button" hidden>تسجيل الخروج</button></div></header>
       <section class="welcome"><div><div class="eyebrow">مرحباً بك في CASS</div><h2>خلّ الغياب علينا، وركّز على يومك.</h2><p>تحكّم بإعدادات بوت AFK وتابع نشاطه من مكان واحد.</p></div><div class="orb">C</div></section>
-      <section class="section-head"><div><h3>ملخص البوت</h3><p>بيانات تجريبية لتوضيح شكل اللوحة — لم يتم ربطها بالبوت بعد.</p></div><span class="live-pill" id="botStatus"><i></i> جارٍ التحقق...</span></section>
-      <section class="stats">
+      <section class="section-head"><div><h3>ملخص البوت</h3><p>بيانات مباشرة عند تشغيل البوت وتسجيل الدخول.</p></div><span class="live-pill" id="botStatus"><i></i> جارٍ التحقق...</span></section>
+      <section class="stats" id="servers">
         <article class="stat"><div class="stat-icon purple">♙</div><span>الأعضاء الغائبون</span><strong id="afkCount">—</strong><small>إجمالي حالات الغياب بالسيرفرات المتاحة</small></article>
         <article class="stat"><div class="stat-icon blue">↗</div><span>المنشنات المسجلة</span><strong id="mentionCount">—</strong><small>يظهر بعد تحميل بيانات السيرفر</small></article>
         <article class="stat"><div class="stat-icon green">▣</div><span>السيرفرات</span><strong id="guildCount">—</strong><small>السيرفرات التي تديرها والبوت موجود فيها</small></article>
@@ -41,7 +40,7 @@
           <div class="setting-row"><div><b>رسالة العودة</b><small>ملخص بمنشنات العضو أثناء غيابه</small></div><span class="arrow">←</span></div>
           <div class="setting-row"><div class="channel-setting"><b>الرومات المستثناة</b><small>حدد الرومات التي لا تنهي الغياب عند الكتابة</small><div id="channelList" class="channel-list">اختر سيرفراً بعد تسجيل الدخول</div></div></div>
         </article>
-        <article class="panel" id="members"><div class="panel-head"><div><h3>الأعضاء الغائبون</h3><p>آخر حالات الغياب في السيرفر المحدد</p></div><span class="lock">قريباً</span></div><div class="empty" id="membersEmpty"><div class="empty-icon">☾</div><b>اختر سيرفراً</b><p>بعد تسجيل الدخول واختيار سيرفر، ستظهر حالات الغياب هنا.</p></div></article>
+        <article class="panel" id="members"><div class="panel-head"><div><h3>الأعضاء الغائبون</h3><p>آخر حالات الغياب في السيرفر المحدد</p></div><span class="lock">بيانات مباشرة</span></div><div class="empty" id="membersEmpty"><div class="empty-icon">☾</div><b>اختر سيرفراً</b><p>بعد تسجيل الدخول واختيار سيرفر، ستظهر حالات الغياب هنا.</p></div></article>
       </section>
       <footer> CASS AFK <span>•</span> لوحة التحكم</footer><script src="./app.js" defer></script>
     </main>
