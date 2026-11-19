@@ -1,15 +1,14 @@
 // =============================================
-//  💤 بوت الغياب AFK ・ Codeon (مجاني)
-//  /afk وتكتب السبب: البوت يحط [AFK] جنب اسمك، ويرد على اللي يمنشنك إنك غايب ومن متى،
-//  وأول ما ترجع وتكتب يشيل الغياب ويعطيك ملخص بكل اللي منشنوك مع روابط الرسائل
+//  💤 CASS AFK ・ بوت الغياب
 // =============================================
 const { GatewayIntentBits: G, SlashCommandBuilder, PermissionFlagsBits: P } = require('discord.js');
 const { start, embed, say, safe, ts } = require('./core');
 const db = require('./db');
+const { createDashboard } = require('./dashboard/server');
 
 const DEF = { afk: {}, cfg: { nick: true, ignore: [] } }; // afk: userId → { reason, since, nick, pings:[{by, url, at}] }
 const PREFIX = '[AFK] ';
-const replied = new Map(); // كولداون الرد على المنشن
+const replied = new Map();
 const COOLDOWN = 30e3;
 const MAX_TRACKED_COOLDOWNS = 5000;
 
@@ -17,7 +16,6 @@ function canReply(key, now) {
   const previous = replied.get(key) || 0;
   if (now - previous < COOLDOWN) return false;
   replied.set(key, now);
-  // تنظيف دوري بسيط حتى لا تكبر الذاكرة مع الوقت
   if (replied.size > MAX_TRACKED_COOLDOWNS) {
     for (const [k, at] of replied) {
       if (now - at >= COOLDOWN) replied.delete(k);
@@ -33,16 +31,15 @@ const ago = ms => {
   return d ? `${d} يوم${h % 24 ? ` و${h % 24} ساعة` : ''}` : h ? `${h} ساعة${m % 60 ? ` و${m % 60} دقيقة` : ''}` : m ? `${m} دقيقة` : 'أقل من دقيقة';
 };
 
-// on: يحفظ اللقب الأصلي ويضيف [AFK] ・ off: يرجّع اللقب الأصلي (لو البادئة لسا موجودة)
 async function setNick(member, on, g, a) {
   if (!g.cfg.nick || !member?.manageable) return;
   if (on) {
     const cur = member.nickname || member.user.globalName || member.user.username;
     if (cur.startsWith(PREFIX)) return;
     a.nick = member.nickname || null;
-    return member.setNickname((PREFIX + cur).slice(0, 32), 'Codeon AFK').catch(() => {});
+    return member.setNickname((PREFIX + cur).slice(0, 32), 'CASS AFK').catch(() => {});
   }
-  if (member.nickname?.startsWith(PREFIX)) await member.setNickname(a?.nick || null, 'Codeon AFK').catch(() => {});
+  if (member.nickname?.startsWith(PREFIX)) await member.setNickname(a?.nick || null, 'CASS AFK').catch(() => {});
 }
 
 async function back(member, g, channel) {
@@ -70,17 +67,14 @@ const cmds = [
       .addChannelOption(o => o.setName('channel').setDescription('الروم').setRequired(true))),
 ];
 
-const client = start({ name: 'بوت الغياب AFK', intents: [G.Guilds, G.GuildMessages], commands: cmds });
+const client = start({ name: 'CASS AFK', intents: [G.Guilds, G.GuildMessages], commands: cmds });
+createDashboard(client, db, DEF);
 
 client.on('messageCreate', safe(async msg => {
   if (!msg.guild || msg.author.bot) return;
   const g = db.guild(msg.guild.id, DEF);
-
-  // 1) الكاتب كان غايب ← يرجع (إلا في الرومات المستثناة)
   if (g.afk[msg.author.id] && !g.cfg.ignore.includes(msg.channelId) && Date.now() - g.afk[msg.author.id].since > 15e3)
     await back(msg.member, g, msg.channel);
-
-  // 2) منشن لشخص غايب ← رد + تسجيل المنشن عنده
   const targets = [...new Set([...msg.mentions.users.keys(), msg.mentions.repliedUser?.id].filter(Boolean))]
     .filter(id => id !== msg.author.id && g.afk[id]);
   if (!targets.length) return;
@@ -104,14 +98,11 @@ client.on('messageCreate', safe(async msg => {
 client.on('interactionCreate', safe(async i => {
   if (!i.guild || !i.isChatInputCommand()) return;
   const g = db.guild(i.guild.id, DEF);
-
   if (i.commandName === 'afk') {
     const reason = clean(i.options.getString('reason'));
     const old = g.afk[i.user.id];
     const a = g.afk[i.user.id] = {
-      reason,
-      since: Date.now(),
-      pings: old?.pings || [],
+      reason, since: Date.now(), pings: old?.pings || [],
       nick: old ? old.nick : (i.member?.nickname ?? null)
     };
     await setNick(i.member, true, g, a); db.save();
