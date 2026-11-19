@@ -13,7 +13,7 @@ function start({ name, intents, partials = [], commands, onReady }) {
   client.once(a > 14 || b >= 22 ? 'clientReady' : 'ready', async () => {
     try { await client.application.commands.set(commands.map(c => c.toJSON())); }
     catch (e) { console.error('❌ تسجيل الأوامر:', e.message); }
-    client.user.setActivity('discord.gg/JPprUwQyUZ', { type: ActivityType.Watching });
+    client.user.setActivity('CASS ON TOP', { type: ActivityType.Watching });
     console.log(`✅ ${name} شغال باسم ${client.user.tag}`);
     try { await onReady?.(client); } catch (e) { console.error(e); }
   });
