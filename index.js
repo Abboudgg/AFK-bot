@@ -1,451 +1,144 @@
+// =============================================
+//  💤 بوت الغياب AFK ・ Codeon (مجاني)
+//  /afk وتكتب السبب: البوت يحط [AFK] جنب اسمك، ويرد على اللي يمنشنك إنك غايب ومن متى،
+//  وأول ما ترجع وتكتب يشيل الغياب ويعطيك ملخص بكل اللي منشنوك مع روابط الرسائل
+// =============================================
+const { GatewayIntentBits: G, SlashCommandBuilder, PermissionFlagsBits: P } = require('discord.js');
+const { start, embed, say, safe, ts } = require('./core');
+const db = require('./db');
 
-const {
-  Client,
-  GatewayIntentBits,
-  ActivityType
-} = require("discord.js");
+const DEF = { afk: {}, cfg: { nick: true, ignore: [] } }; // afk: userId → { reason, since, nick, pings:[{by, url, at}] }
+const PREFIX = '[AFK] ';
+const replied = new Map(); // كولداون الرد على المنشن
+const COOLDOWN = 30e3;
+const MAX_TRACKED_COOLDOWNS = 5000;
 
-const express = require("express");
-const crypto = require("crypto");
-const fs = require("fs");
-const path = require("path");
-
-const app = express();
-
-app.use(express.json());
-
-const PORT = process.env.PORT || 3000;
-const TOKEN = process.env.DISCORD_TOKEN;
-const PASSWORD = process.env.DASHBOARD_PASSWORD;
-
-const AFK_CHANNEL_ID = "1571122453655326851";
-const AFK_ROLE_ID = "1572139691577315338";
-
-if (!TOKEN || !PASSWORD) {
-  console.error("Missing DISCORD_TOKEN or DASHBOARD_PASSWORD");
-  process.exit(1);
-}
-
-// حفظ بيانات AFK
-const DATA_FILE = path.join(__dirname, "afk-data.json");
-
-function loadData() {
-  try {
-    return JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
-  } catch {
-    return { afk: {}, logs: [] };
-  }
-}
-
-let data = loadData();
-
-function saveData() {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-}
-
-function addLog(username, action) {
-  data.logs.unshift({
-    username,
-    action,
-    time: new Date().toLocaleString("en-GB", {
-      timeZone: "Asia/Riyadh"
-    })
-  });
-
-  data.logs = data.logs.slice(0, 100);
-  saveData();
-}
-
-// حماية تسجيل الدخول
-function sign(value) {
-  return crypto
-    .createHmac("sha256", PASSWORD)
-    .update(value)
-    .digest("hex");
-}
-
-function createSession() {
-  const expires = Date.now() + 12 * 60 * 60 * 1000;
-  return expires + "." + sign(String(expires));
-}
-
-function isAuthenticated(req) {
-  const cookies = (req.headers.cookie || "")
-    .split(";")
-    .reduce((result, item) => {
-      const parts = item.trim().split("=");
-      result[parts[0]] = parts.slice(1).join("=");
-      return result;
-    }, {});
-
-  const value = cookies.afk_session;
-  if (!value) return false;
-
-  const parts = value.split(".");
-  if (parts.length !== 2) return false;
-
-  const expires = parts[0];
-  if (Number(expires) < Date.now()) return false;
-
-  const expected = sign(expires);
-
-  try {
-    return crypto.timingSafeEqual(
-      Buffer.from(parts[1]),
-      Buffer.from(expected)
-    );
-  } catch {
-    return false;
-  }
-}
-
-function auth(req, res, next) {
-  if (!isAuthenticated(req)) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-  next();
-}
-
-// صفحة لوحة التحكم
-app.get("/", (req, res) => {
-  res.send(`
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AFK BY CASS</title>
-<style>
-*{box-sizing:border-box}
-body{margin:0;background:#10111a;color:white;font-family:Arial,sans-serif;padding:20px}
-.container{max-width:650px;margin:35px auto}
-.card{background:#1c1e2b;padding:20px;border-radius:16px;margin-bottom:15px}
-h1{color:#a78bfa}
-input,select,button{width:100%;padding:13px;margin-top:10px;border:0;border-radius:9px;font-size:15px}
-input,select{background:#303244;color:white}
-button{background:#805ad5;color:white;font-weight:bold;cursor:pointer}
-.secondary{background:#3a3c4c}
-.hidden{display:none}
-.log{padding:12px;border-bottom:1px solid #393b4c}
-small{color:#aaa}
-</style>
-</head>
-<body>
-<div class="container">
-  <div class="card">
-    <h1>AFK BY CASS</h1>
-    <p>لوحة التحكم الخاصة بالبوت</p>
-  </div>
-
-  <div class="card" id="login">
-    <h3>تسجيل الدخول</h3>
-    <input id="password" type="password" placeholder="كلمة المرور">
-    <button onclick="login()">دخول</button>
-    <p id="loginError"></p>
-  </div>
-
-  <div id="dashboard" class="hidden">
-    <div class="card">
-      <h3>حالة اتصال البوت</h3>
-      <p id="connection">جاري التحقق...</p>
-      <p id="botName"></p>
-      <p id="afkCount"></p>
-    </div>
-
-    <div class="card">
-      <h3>نشاط البوت</h3>
-      <label>نوع النشاط</label>
-      <select id="activity">
-        <option value="Playing">Playing</option>
-        <option value="Streaming">Streaming</option>
-        <option value="Listening">Listening</option>
-        <option value="Watching">Watching</option>
-        <option value="Competing">Competing</option>
-      </select>
-
-      <label>النص</label>
-      <input id="activityText" placeholder="اكتب حالة البوت">
-
-      <div id="streamBox" class="hidden">
-        <label>رابط البث</label>
-        <input id="streamUrl" placeholder="https://www.twitch.tv/...">
-      </div>
-
-      <label>حالة Discord</label>
-      <select id="status">
-        <option value="online">Online</option>
-        <option value="idle">Idle</option>
-        <option value="dnd">Do Not Disturb</option>
-        <option value="invisible">Invisible</option>
-      </select>
-
-      <button onclick="savePresence()">حفظ التغييرات</button>
-      <p id="saveMessage"></p>
-    </div>
-
-    <div class="card">
-      <h3>سجل أعضاء AFK</h3>
-      <div id="logs">لا توجد سجلات حالياً</div>
-    </div>
-
-    <button class="secondary" onclick="logout()">تسجيل الخروج</button>
-  </div>
-</div>
-
-<script>
-async function api(url, options) {
-  const response = await fetch(url, options || {});
-  const result = await response.json();
-  if (!response.ok) throw new Error(result.error || "حدث خطأ");
-  return result;
-}
-
-async function login() {
-  try {
-    await api("/api/login", {
-      method: "POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({
-        password: document.getElementById("password").value
-      })
-    });
-
-    document.getElementById("login").classList.add("hidden");
-    document.getElementById("dashboard").classList.remove("hidden");
-    refresh();
-  } catch {
-    document.getElementById("loginError").textContent =
-      "كلمة المرور غير صحيحة";
-  }
-}
-
-async function refresh() {
-  try {
-    const result = await api("/api/status");
-    document.getElementById("connection").textContent =
-      result.online ? "🟢 Online" : "🔴 Offline";
-    document.getElementById("botName").textContent =
-      result.name || "";
-    document.getElementById("afkCount").textContent =
-      "أعضاء AFK: " + result.afkCount;
-
-    const logs = await api("/api/logs");
-    document.getElementById("logs").innerHTML =
-      logs.length ? logs.map(function(log) {
-        return '<div class="log"><b>' +
-          escapeHtml(log.username) + '</b><br>' +
-          escapeHtml(log.action) + '<br><small>' +
-          escapeHtml(log.time) + '</small></div>';
-      }).join("") : "لا توجد سجلات حالياً";
-  } catch {
-    document.getElementById("connection").textContent =
-      "تعذر جلب الحالة";
-  }
-}
-
-function escapeHtml(value) {
-  return String(value).replace(/[&<>"']/g, function(c) {
-    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
-  });
-}
-
-async function savePresence() {
-  try {
-    await api("/api/presence", {
-      method: "POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({
-        activity: document.getElementById("activity").value,
-        text: document.getElementById("activityText").value,
-        url: document.getElementById("streamUrl").value,
-        status: document.getElementById("status").value
-      })
-    });
-
-    document.getElementById("saveMessage").textContent =
-      "✅ تم تحديث نشاط البوت";
-  } catch(error) {
-    document.getElementById("saveMessage").textContent =
-      "❌ " + error.message;
-  }
-}
-
-document.getElementById("activity").addEventListener("change", function() {
-  document.getElementById("streamBox").classList.toggle(
-    "hidden", this.value !== "Streaming"
-  );
-});
-
-async function logout() {
-  await fetch("/api/logout", {method:"POST"});
-  location.reload();
-}
-</script>
-</body>
-</html>
-`);
-});
-
-// تسجيل الدخول
-app.post("/api/login", (req, res) => {
-  const supplied = String(req.body.password || "");
-
-  if (supplied !== PASSWORD) {
-    return res.status(401).json({ error: "Wrong password" });
-  }
-
-  const session = createSession();
-
-  res.setHeader("Set-Cookie",
-    "afk_session=" + session +
-    "; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=43200"
-  );
-
-  res.json({ success: true });
-});
-
-app.post("/api/logout", (req, res) => {
-  res.setHeader("Set-Cookie",
-    "afk_session=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0"
-  );
-  res.json({ success: true });
-});
-
-// معلومات البوت
-app.get("/api/status", auth, (req, res) => {
-  res.json({
-    online: client.isReady(),
-    name: client.user?.tag || null,
-    afkCount: Object.keys(data.afk).length
-  });
-});
-
-// السجل
-app.get("/api/logs", auth, (req, res) => {
-  res.json(data.logs);
-});
-
-// تغيير النشاط
-app.post("/api/presence", auth, async (req, res) => {
-  if (!client.isReady()) {
-    return res.status(503).json({ error: "البوت غير متصل" });
-  }
-
-  const types = {
-    Playing: ActivityType.Playing,
-    Streaming: ActivityType.Streaming,
-    Listening: ActivityType.Listening,
-    Watching: ActivityType.Watching,
-    Competing: ActivityType.Competing
-  };
-
-  const { activity, text, url, status } = req.body;
-
-  if (!types[activity] || !text || text.length > 128) {
-    return res.status(400).json({ error: "إعدادات النشاط غير صحيحة" });
-  }
-
-  if (!["online", "idle", "dnd", "invisible"].includes(status)) {
-    return res.status(400).json({ error: "حالة الاتصال غير صحيحة" });
-  }
-
-  const presenceActivity = {
-    name: text,
-    type: types[activity]
-  };
-
-  if (activity === "Streaming") {
-    try {
-      const parsed = new URL(url);
-      if (parsed.protocol !== "https:") throw new Error();
-      presenceActivity.url = parsed.toString();
-    } catch {
-      return res.status(400).json({ error: "رابط البث غير صحيح" });
+function canReply(key, now) {
+  const previous = replied.get(key) || 0;
+  if (now - previous < COOLDOWN) return false;
+  replied.set(key, now);
+  // تنظيف دوري بسيط حتى لا تكبر الذاكرة مع الوقت
+  if (replied.size > MAX_TRACKED_COOLDOWNS) {
+    for (const [k, at] of replied) {
+      if (now - at >= COOLDOWN) replied.delete(k);
+      if (replied.size <= MAX_TRACKED_COOLDOWNS) break;
     }
   }
+  return true;
+}
 
-  try {
-    client.user.setPresence({
-      activities: [presenceActivity],
-      status
-    });
+const clean = s => String(s || '').replace(/@(everyone|here)/g, '@​$1').replace(/<@[!&]?\d+>/g, '@منشن').replace(/https?:\/\/\S+/g, '🔗').slice(0, 150);
+const ago = ms => {
+  const m = Math.floor(ms / 60e3), h = Math.floor(m / 60), d = Math.floor(h / 24);
+  return d ? `${d} يوم${h % 24 ? ` و${h % 24} ساعة` : ''}` : h ? `${h} ساعة${m % 60 ? ` و${m % 60} دقيقة` : ''}` : m ? `${m} دقيقة` : 'أقل من دقيقة';
+};
 
-    res.json({ success: true });
-  } catch (error) {
-    console.error("Presence error:", error);
-    res.status(500).json({ error: "تعذر تغيير النشاط" });
+// on: يحفظ اللقب الأصلي ويضيف [AFK] ・ off: يرجّع اللقب الأصلي (لو البادئة لسا موجودة)
+async function setNick(member, on, g, a) {
+  if (!g.cfg.nick || !member?.manageable) return;
+  if (on) {
+    const cur = member.nickname || member.user.globalName || member.user.username;
+    if (cur.startsWith(PREFIX)) return;
+    a.nick = member.nickname || null;
+    return member.setNickname((PREFIX + cur).slice(0, 32), 'Codeon AFK').catch(() => {});
   }
-});
+  if (member.nickname?.startsWith(PREFIX)) await member.setNickname(a?.nick || null, 'Codeon AFK').catch(() => {});
+}
 
-// تشغيل الموقع
-app.listen(PORT, "0.0.0.0", () => {
-  console.log("Dashboard running on port " + PORT);
-});
+async function back(member, g, channel) {
+  const a = member && g.afk[member.id]; if (!a) return;
+  delete g.afk[member.id]; db.save();
+  await setNick(member, false, g, a);
+  const pings = Array.isArray(a.pings) ? a.pings : [];
+  const list = pings.slice(-10).map(p => `▫️ <@${p.by}> ${ts(p.at)} ・ [الرسالة](${p.url})`);
+  const e = embed(`👋 هلا بعودتك ${member.displayName}!`,
+    `غبت **${ago(Date.now() - a.since)}**${pings.length ? `\n📨 منشنوك **${pings.length}** مرة:\n${list.join('\n')}${pings.length > 10 ? `\n... و${pings.length - 10} غيرها` : ''}` : '\nما أحد منشنك وأنت غايب 😴'}`);
+  const m = await channel?.send({ content: `${member}`, embeds: [e], allowedMentions: { users: [member.id] } }).catch(() => null);
+  if (m && !pings.length) setTimeout(() => m.delete().catch(() => {}), 10e3);
+}
 
-// تشغيل بوت Discord
-const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.GuildVoiceStates
-  ]
-});
+const cmds = [
+  new SlashCommandBuilder().setName('afk').setDescription('حط نفسك غايب، والبوت يرد على اللي يمنشنك')
+    .addStringOption(o => o.setName('reason').setDescription('سبب الغياب (مثل: نايم، بالدوام، أصلي)').setMaxLength(150)),
+  new SlashCommandBuilder().setName('afklist').setDescription('مين غايب الحين بالسيرفر'),
+  new SlashCommandBuilder().setName('afkadmin').setDescription('إعدادات بوت الغياب').setDefaultMemberPermissions(P.ManageNicknames)
+    .addSubcommand(s => s.setName('remove').setDescription('شيل الغياب عن عضو')
+      .addUserOption(o => o.setName('user').setDescription('العضو').setRequired(true)))
+    .addSubcommand(s => s.setName('nickname').setDescription('تشغيل أو إيقاف إضافة [AFK] للاسم')
+      .addBooleanOption(o => o.setName('enabled').setDescription('شغّال؟').setRequired(true)))
+    .addSubcommand(s => s.setName('ignore').setDescription('روم ما يشيل فيه الغياب لو كتبت (مثل روم البوتات) ・ ضغطة ثانية تشيله')
+      .addChannelOption(o => o.setName('channel').setDescription('الروم').setRequired(true))),
+];
 
-client.once("ready", () => {
-  console.log("Logged in as " + client.user.tag);
-});
+const client = start({ name: 'بوت الغياب AFK', intents: [G.Guilds, G.GuildMessages], commands: cmds });
 
-// إدارة AFK
-client.on("voiceStateUpdate", async (oldState, newState) => {
-  const member = newState.member || oldState.member;
-console.log("[VOICE EVENT]", {
-  member: member?.user?.tag,
-  oldChannel: oldState.channelId,
-  newChannel: newState.channelId,
-  afkChannel: AFK_CHANNEL_ID
-});
-  if (!member || member.user.bot) return;
+client.on('messageCreate', safe(async msg => {
+  if (!msg.guild || msg.author.bot) return;
+  const g = db.guild(msg.guild.id, DEF);
 
-  const joinedAFK =
-    newState.channelId === AFK_CHANNEL_ID &&
-    oldState.channelId !== AFK_CHANNEL_ID;
+  // 1) الكاتب كان غايب ← يرجع (إلا في الرومات المستثناة)
+  if (g.afk[msg.author.id] && !g.cfg.ignore.includes(msg.channelId) && Date.now() - g.afk[msg.author.id].since > 15e3)
+    await back(msg.member, g, msg.channel);
 
-  const leftAFK =
-    oldState.channelId === AFK_CHANNEL_ID &&
-    newState.channelId !== AFK_CHANNEL_ID;
-
-  try {
-    if (joinedAFK) {
-      if (!Object.prototype.hasOwnProperty.call(data.afk, member.id)) {
-        data.afk[member.id] = member.nickname;
-        saveData();
-      }
-
-      const currentName = member.nickname || member.user.username;
-
-      if (!currentName.startsWith("[AFK] ")) {
-        await member.setNickname("[AFK] " + currentName);
-      }
-
-      await member.roles.add(AFK_ROLE_ID);
-      addLog(member.user.tag, "دخل روم AFK");
-    }
-
-    if (leftAFK) {
-      if (Object.prototype.hasOwnProperty.call(data.afk, member.id)) {
-        await member.setNickname(data.afk[member.id]);
-        delete data.afk[member.id];
-        saveData();
-      }
-
-      await member.roles.remove(AFK_ROLE_ID);
-      addLog(member.user.tag, "خرج من روم AFK");
-    }
-  } catch (error) {
-    console.error("AFK Error:", error);
+  // 2) منشن لشخص غايب ← رد + تسجيل المنشن عنده
+  const targets = [...new Set([...msg.mentions.users.keys(), msg.mentions.repliedUser?.id].filter(Boolean))]
+    .filter(id => id !== msg.author.id && g.afk[id]);
+  if (!targets.length) return;
+  const lines = [];
+  for (const id of targets.slice(0, 5)) {
+    const a = g.afk[id];
+    a.pings ??= [];
+    a.pings.push({ by: msg.author.id, url: msg.url, at: Date.now() });
+    if (a.pings.length > 50) a.pings.shift();
+    const k = msg.channelId + id;
+    if (!canReply(k, Date.now())) continue;
+    lines.push(`💤 <@${id}> غايب من ${ts(a.since)}${a.reason ? ` ・ **${a.reason}**` : ''}`);
   }
-});
+  db.save();
+  if (lines.length) {
+    const r = await msg.reply({ content: lines.join('\n'), allowedMentions: { parse: [], repliedUser: false } }).catch(() => null);
+    if (r) setTimeout(() => r.delete().catch(() => {}), 15e3);
+  }
+}));
 
-client.login(TOKEN).catch(error => {
-  console.error("Discord login failed:", error.message);
-});
+client.on('interactionCreate', safe(async i => {
+  if (!i.guild || !i.isChatInputCommand()) return;
+  const g = db.guild(i.guild.id, DEF);
+
+  if (i.commandName === 'afk') {
+    const reason = clean(i.options.getString('reason'));
+    const old = g.afk[i.user.id];
+    const a = g.afk[i.user.id] = {
+      reason,
+      since: Date.now(),
+      pings: old?.pings || [],
+      nick: old ? old.nick : (i.member?.nickname ?? null)
+    };
+    await setNick(i.member, true, g, a); db.save();
+    return i.reply({ embeds: [embed('💤 صرت غايب', `${i.user}${reason ? `\n📝 السبب: **${reason}**` : ''}\nأي أحد يمنشنك بقوله إنك غايب، وأول ما تكتب برجعك 👋`)], allowedMentions: { parse: [] } });
+  }
+  if (i.commandName === 'afklist') {
+    const l = Object.entries(g.afk).sort((a, b) => a[1].since - b[1].since).slice(0, 30)
+      .map(([u, a]) => `💤 <@${u}> ・ ${ts(a.since)}${a.reason ? ` ・ ${a.reason}` : ''}`);
+    return say(i, null, { embeds: [embed(`💤 الغايبين (${Object.keys(g.afk).length})`, l.join('\n') || 'ما فيه أحد غايب، الكل صاحي 😄')] });
+  }
+  if (i.commandName === 'afkadmin') {
+    const sub = i.options.getSubcommand();
+    if (sub === 'remove') {
+      const u = i.options.getUser('user');
+      if (!g.afk[u.id]) return say(i, `❌ ${u} مو غايب.`);
+      const a = g.afk[u.id]; delete g.afk[u.id]; db.save();
+      await setNick(await i.guild.members.fetch(u.id).catch(() => null), false, g, a);
+      return say(i, `✅ شلنا الغياب عن ${u}.`);
+    }
+    if (sub === 'nickname') {
+      g.cfg.nick = i.options.getBoolean('enabled'); db.save();
+      return say(i, g.cfg.nick ? '✅ البوت بيضيف `[AFK]` جنب اسم الغايب (يحتاج صلاحية Manage Nicknames ورتبته فوق).' : '✅ ما عاد البوت يغيّر الأسماء.');
+    }
+    if (sub === 'ignore') {
+      const ch = i.options.getChannel('channel'), has = g.cfg.ignore.includes(ch.id);
+      g.cfg.ignore = has ? g.cfg.ignore.filter(x => x !== ch.id) : [...g.cfg.ignore, ch.id].slice(-20); db.save();
+      return say(i, has ? `✅ ${ch} رجع عادي: الكتابة فيه تشيل الغياب.` : `✅ الكتابة في ${ch} ما تشيل الغياب.`);
+    }
+  }
+}));
