@@ -7,3 +7,5 @@
 .personal-view .sidebar,.personal-view .main>header,.personal-view .main>.welcome,.personal-view .main>.section-head,.personal-view .main>.stats,.personal-view .main>.content-grid,.personal-view .main>footer{display:none!important}.personal-view .account-panel{display:flex}
 .logged-out .shell{visibility:hidden}.logged-out .auth-gate{visibility:visible}
 @media(max-width:600px){.account-panel{flex-wrap:wrap}.account-panel .logout{margin-right:0}}
+
+.owner-view .account-panel{display:flex}
