@@ -3,7 +3,7 @@ require('dotenv').config();
 const { Client, EmbedBuilder, ActivityType, version } = require('discord.js');
 
 const GOLD = 0xD4AF6A;
-const BRAND = 'Codeon ・ discord.gg/JPprUwQyUZ';
+const BRAND = 'CASS AFK ・ Discord';
 
 function start({ name, intents, partials = [], commands, onReady }) {
   const TOKEN = process.env.TOKEN;
