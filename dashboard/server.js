@@ -3,8 +3,9 @@ const session = require('express-session');
 const path = require('path');
 
 const DISCORD_API = 'https://discord.com/api/v10';
-const MANAGE_GUILD = 0x20n;
-const ADMINISTRATOR = 0x8n;
+const ACCESS_GUILD_ID = '1571120459775352925';
+const OWNER_ROLE_ID = '1571122288856932424';
+const CO_OWNER_ROLE_ID = '1571251804539191377';
 
 function createDashboard(client, db, defaults) {
   const app = express();
@@ -47,13 +48,36 @@ function createDashboard(client, db, defaults) {
     next();
   }
 
+  async function getAccessMember(userId) {
+    const guild = client.guilds.cache.get(ACCESS_GUILD_ID);
+    if (!guild) return { guild: null, member: null, isOwner: false, role: null };
+    try {
+      const member = await guild.members.fetch(userId);
+      const isOwner = member.roles.cache.has(OWNER_ROLE_ID);
+      const isCoOwner = member.roles.cache.has(CO_OWNER_ROLE_ID);
+      return { guild, member, isOwner: isOwner || isCoOwner, role: isOwner ? 'Owner ツ .' : isCoOwner ? 'CO Owner ツ .' : null };
+    } catch {
+      return { guild, member: null, isOwner: false, role: null };
+    }
+  }
+
+  async function requireOwner(req, res, next) {
+    try {
+      const access = await getAccessMember(req.session.user.id);
+      if (!access.isOwner || !access.guild) {
+        return res.status(403).json({ error: 'هذه الميزة مخصصة لرتبتي Owner وCO Owner فقط.' });
+      }
+      req.accessGuild = access.guild;
+      next();
+    } catch (error) {
+      console.error('[CASS dashboard owner check]', error.message);
+      res.status(502).json({ error: 'تعذر التحقق من رتبتك في السيرفر.' });
+    }
+  }
+
   async function getManageableGuilds(req) {
-    const guilds = await discordRequest(DISCORD_API + '/users/@me/guilds', req.session.accessToken);
-    return guilds.filter(g => {
-      const permissions = BigInt(g.permissions || '0');
-      return (permissions & MANAGE_GUILD) === MANAGE_GUILD ||
-        (permissions & ADMINISTRATOR) === ADMINISTRATOR;
-    }).filter(g => client.guilds.cache.has(g.id));
+    const access = await getAccessMember(req.session.user.id);
+    return access.isOwner && access.guild ? [access.guild] : [];
   }
 
   app.get('/auth/discord', (req, res) => {
@@ -64,7 +88,7 @@ function createDashboard(client, db, defaults) {
       client_id: clientId,
       redirect_uri: redirectUri,
       response_type: 'code',
-      scope: 'identify guilds',
+      scope: 'identify',
       state
     });
     res.redirect('https://discord.com/oauth2/authorize?' + query.toString());
@@ -123,11 +147,13 @@ function createDashboard(client, db, defaults) {
     });
   });
 
-  app.get('/api/me', (req, res) => {
-    res.json({ user: req.session.user || null, loginConfigured: oauthReady });
+  app.get('/api/me', async (req, res) => {
+    if (!req.session.user) return res.json({ user: null, loginConfigured: oauthReady, isOwner: false, role: null });
+    const access = await getAccessMember(req.session.user.id);
+    res.json({ user: req.session.user, loginConfigured: oauthReady, isOwner: access.isOwner, role: access.role });
   });
 
-  app.get('/api/guilds', requireLogin, async (req, res) => {
+  app.get('/api/guilds', requireLogin, requireOwner, async (req, res) => {
     try {
       const allowed = await getManageableGuilds(req);
       res.json({ guilds: allowed.map(g => {
@@ -151,7 +177,7 @@ function createDashboard(client, db, defaults) {
     try {
       const allowed = await getManageableGuilds(req);
       if (!allowed.some(g => g.id === req.params.guildId)) {
-        return res.status(403).json({ error: 'ما عندك صلاحية إدارة هذا السيرفر أو أن البوت غير موجود فيه.' });
+        return res.status(403).json({ error: 'ما عندك رتبة Owner أو CO Owner في سيرفر CASS المعتمد، أو أن البوت غير موجود فيه.' });
       }
       req.botGuild = client.guilds.cache.get(req.params.guildId);
       next();
@@ -161,7 +187,7 @@ function createDashboard(client, db, defaults) {
     }
   }
 
-  app.get('/api/guild/:guildId/overview', requireLogin, authorizeGuild, (req, res) => {
+  app.get('/api/guild/:guildId/overview', requireLogin, requireOwner, authorizeGuild, (req, res) => {
     const data = db.guild(req.params.guildId, defaults);
     const members = Object.entries(data.afk || {}).map(([id, afk]) => ({
       id,
@@ -172,7 +198,7 @@ function createDashboard(client, db, defaults) {
     res.json({ members, mentionCount: members.reduce((sum, member) => sum + member.mentions, 0) });
   });
 
-  app.get('/api/guild/:guildId/channels', requireLogin, authorizeGuild, async (req, res) => {
+  app.get('/api/guild/:guildId/channels', requireLogin, requireOwner, authorizeGuild, async (req, res) => {
     try {
       const channels = await req.botGuild.channels.fetch();
       res.json({ channels: [...channels.values()]
@@ -185,12 +211,12 @@ function createDashboard(client, db, defaults) {
     }
   });
 
-  app.get('/api/guild/:guildId/settings', requireLogin, authorizeGuild, (req, res) => {
+  app.get('/api/guild/:guildId/settings', requireLogin, requireOwner, authorizeGuild, (req, res) => {
     const data = db.guild(req.params.guildId, defaults);
     res.json({ settings: { nickname: Boolean(data.cfg.nick), ignoredChannels: data.cfg.ignore || [] } });
   });
 
-  app.put('/api/guild/:guildId/settings', requireLogin, authorizeGuild, async (req, res) => {
+  app.put('/api/guild/:guildId/settings', requireLogin, requireOwner, authorizeGuild, async (req, res) => {
     if (publicUrl && req.get('origin') !== publicUrl.replace(/\/$/, '')) {
       return res.status(403).json({ error: 'مصدر الطلب غير موثوق.' });
     }
