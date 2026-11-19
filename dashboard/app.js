@@ -113,11 +113,25 @@ async function init() {
     const [status, me] = await Promise.all([api('/api/status'), api('/api/me')]);
     setStatus(status.ready ? 'البوت يعمل' : 'البوت غير متصل', status.ready);
     if (me.user) {
+      $('authGate').hidden = true;
       $('loginButton').hidden = true;
       $('logoutButton').hidden = false;
-      $('settingsLock').textContent = 'متصل';
-      await loadGuilds();
+      $('accountName').textContent = me.user.global_name || me.user.username;
+      $('accountTag').textContent = '@' + me.user.username;
+      $('accountRole').textContent = me.isOwner ? me.role + ' — صلاحية كاملة' : 'عضو — حساب شخصي';
+      $('accountAvatar').src = me.user.avatar
+        ? 'https://cdn.discordapp.com/avatars/' + me.user.id + '/' + me.user.avatar + '.png?size=128'
+        : 'https://cdn.discordapp.com/embed/avatars/0.png';
+      if (me.isOwner) {
+        document.body.classList.add('owner-view');
+        $('settingsLock').textContent = 'صلاحية كاملة';
+        await loadGuilds();
+      } else {
+        document.body.classList.add('personal-view');
+      }
     } else {
+      $('authGate').hidden = false;
+      document.body.classList.add('logged-out');
       $('guildSelect').disabled = true;
       $('guildSelect').innerHTML = '<option value="">سجّل دخولك أولاً</option>';
     }
@@ -126,6 +140,8 @@ async function init() {
       $('loginButton').removeAttribute('href');
       $('loginButton').classList.add('disabled');
       $('settingsLock').textContent = 'إعداد OAuth مطلوب';
+      $('authLogin').textContent = 'إعداد تسجيل الدخول مطلوب';
+      $('authLogin').removeAttribute('href');
     }
   } catch (error) {
     setStatus('تعذر الاتصال بالخادم', false);
@@ -140,6 +156,10 @@ $('guildSelect').addEventListener('change', async event => {
 $('nicknameToggle').addEventListener('click', async () => {
   if (!state.settings) return;
   try { await updateSettings({ nickname: !state.settings.nickname }); }
+  catch (error) { alert(error.message); }
+});
+$('accountLogout').addEventListener('click', async () => {
+  try { await api('/auth/logout', { method: 'POST' }); location.reload(); }
   catch (error) { alert(error.message); }
 });
 $('logoutButton').addEventListener('click', async () => {
