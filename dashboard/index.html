@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#090b12">
+  <title>CASS AFK — لوحة التحكم</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="#"><span class="brand-mark">C</span><span><b>CASS</b><small>AFK CONTROL</small></span></a>
+      <div class="side-label">القائمة الرئيسية</div>
+      <nav>
+        <a class="active" href="#overview"><span>▦</span> نظرة عامة</a>
+        <a href="#servers"><span>▣</span> السيرفرات</a>
+        <a href="#settings"><span>⚙</span> إعدادات AFK</a>
+        <a href="#members"><span>♙</span> الأعضاء الغائبون</a>
+        <a href="#mentions"><span>↗</span> سجل المنشنات</a>
+      </nav>
+      <div class="sidebar-bottom"><span class="status-dot"></span><span>واجهة أولية قيد التطوير</span></div>
+    </aside>
+    <main class="main" id="overview">
+      <header class="topbar"><div><div class="eyebrow">مساحة التحكم</div><h1>نظرة عامة</h1></div><div class="top-actions"><span class="preview-tag">معاينة التصميم</span><button class="login" type="button" disabled>تسجيل دخول Discord قريباً</button></div></header>
+      <section class="welcome"><div><div class="eyebrow">مرحباً بك في CASS</div><h2>خلّ الغياب علينا، وركّز على يومك.</h2><p>تحكّم بإعدادات بوت AFK وتابع نشاطه من مكان واحد.</p></div><div class="orb">C</div></section>
+      <section class="section-head"><div><h3>ملخص البوت</h3><p>بيانات تجريبية لتوضيح شكل اللوحة — لم يتم ربطها بالبوت بعد.</p></div><span class="live-pill"><i></i> بانتظار الربط</span></section>
+      <section class="stats">
+        <article class="stat"><div class="stat-icon purple">♙</div><span>الأعضاء الغائبون</span><strong>—</strong><small>ستظهر بعد ربط البوت</small></article>
+        <article class="stat"><div class="stat-icon blue">↗</div><span>المنشنات المسجلة</span><strong>—</strong><small>ستظهر بعد ربط قاعدة البيانات</small></article>
+        <article class="stat"><div class="stat-icon green">▣</div><span>السيرفرات</span><strong>—</strong><small>تتطلب تسجيل دخول Discord</small></article>
+        <article class="stat"><div class="stat-icon orange">◷</div><span>حالة البوت</span><strong class="waiting">غير مربوط</strong><small>هذه ليست حالة تشغيل فعلية</small></article>
+      </section>
+      <section class="content-grid">
+        <article class="panel" id="settings"><div class="panel-head"><div><h3>إعدادات الغياب</h3><p>معاينة لعناصر التحكم القادمة</p></div><span class="lock">قريباً</span></div>
+          <div class="setting-row"><div><b>إضافة [AFK] للاسم</b><small>إظهار حالة الغياب بجانب اسم العضو</small></div><span class="toggle"></span></div>
+          <div class="setting-row"><div><b>رسالة الغياب</b><small>تخصيص الرد عند منشن عضو غائب</small></div><span class="arrow">←</span></div>
+          <div class="setting-row"><div><b>رسالة العودة</b><small>ملخص بمنشنات العضو أثناء غيابه</small></div><span class="arrow">←</span></div>
+          <div class="setting-row"><div><b>الرومات المستثناة</b><small>اختيار الرومات التي لا تنهي الغياب</small></div><span class="arrow">←</span></div>
+        </article>
+        <article class="panel" id="members"><div class="panel-head"><div><h3>الأعضاء الغائبون</h3><p>آخر حالات الغياب في السيرفر المحدد</p></div><span class="lock">قريباً</span></div><div class="empty"><div class="empty-icon">☾</div><b>بانتظار ربط البوت</b><p>ستظهر قائمة الأعضاء الغائبين هنا بعد إعداد الاتصال الآمن.</p></div></article>
+      </section>
+      <footer> CASS AFK <span>•</span> لوحة التحكم — نسخة التطوير الأولى</footer>
+    </main>
+  </div>
+</body>
+</html>
