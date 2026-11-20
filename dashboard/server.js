@@ -187,14 +187,20 @@ function createDashboard(client, db, defaults) {
     }
   }
 
-  app.get('/api/guild/:guildId/overview', requireLogin, requireOwner, authorizeGuild, (req, res) => {
+  app.get('/api/guild/:guildId/overview', requireLogin, requireOwner, authorizeGuild, async (req, res) => {
     const data = db.guild(req.params.guildId, defaults);
-    const members = Object.entries(data.afk || {}).map(([id, afk]) => ({
-      id,
-      reason: String(afk.reason || '').slice(0, 150),
-      since: Number(afk.since || 0),
-      mentions: Array.isArray(afk.pings) ? afk.pings.length : 0
-    })).sort((a, b) => a.since - b.since);
+    const entries = Object.entries(data.afk || {});
+    const members = await Promise.all(entries.map(async ([id, afk]) => {
+      const member = await req.botGuild.members.fetch(id).catch(() => null);
+      return {
+        id,
+        name: member?.displayName || member?.user?.globalName || member?.user?.username || 'عضو غير معروف',
+        reason: String(afk.reason || '').slice(0, 150),
+        since: Number(afk.since || 0),
+        mentions: Array.isArray(afk.pings) ? afk.pings.length : 0
+      };
+    }));
+    members.sort((a, b) => a.since - b.since);
     res.json({ members, mentionCount: members.reduce((sum, member) => sum + member.mentions, 0) });
   });
 
