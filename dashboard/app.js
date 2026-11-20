@@ -74,7 +74,7 @@ async function loadGuild(id) {
       item.className = 'member-item';
       const main = document.createElement('div');
       const name = document.createElement('b');
-      name.textContent = 'عضو ' + member.id;
+      name.textContent = member.name || 'عضو غير معروف';
       const reason = document.createElement('small');
       reason.textContent = member.reason || 'بدون سبب';
       main.append(name, reason);
