@@ -1,13 +1,17 @@
 // =============================================
 //  💤 CASS AFK ・ بوت الغياب
 // =============================================
-const { GatewayIntentBits: G, SlashCommandBuilder, PermissionFlagsBits: P } = require('discord.js');
+const { GatewayIntentBits: G, Partials, SlashCommandBuilder, PermissionFlagsBits: P } = require('discord.js');
 const { start, embed, say, safe, ts } = require('./core');
 const db = require('./db');
 const { createDashboard } = require('./dashboard/server');
 
 const DEF = { afk: {}, cfg: { nick: true, ignore: [] } }; // afk: userId → { reason, since, nick, pings:[{by, url, at}] }
 const PREFIX = '[AFK] ';
+const AFK_VOICE_CHANNEL_ID = '1571122453655326851';
+const AFK_ROLE_ID = '1572139691577315338';
+const AFK_GUILD_ID = '1571120459775352925';
+const pendingReasons = new Set();
 const replied = new Map();
 const COOLDOWN = 30e3;
 const MAX_TRACKED_COOLDOWNS = 5000;
@@ -46,6 +50,9 @@ async function back(member, g, channel) {
   const a = member && g.afk[member.id]; if (!a) return;
   delete g.afk[member.id]; db.save();
   await setNick(member, false, g, a);
+  if (member.guild.id === AFK_GUILD_ID) {
+    await member.roles.remove(AFK_ROLE_ID, 'CASS AFK: عاد العضو من الغياب').catch(() => {});
+  }
   const pings = Array.isArray(a.pings) ? a.pings : [];
   const list = pings.slice(-10).map(p => `▫️ <@${p.by}> ${ts(p.at)} ・ [الرسالة](${p.url})`);
   const e = embed(`👋 هلا بعودتك ${member.displayName}!`,
@@ -67,11 +74,60 @@ const cmds = [
       .addChannelOption(o => o.setName('channel').setDescription('الروم').setRequired(true))),
 ];
 
-const client = start({ name: 'CASS AFK', intents: [G.Guilds, G.GuildMessages], commands: cmds });
+const client = start({
+  name: 'CASS AFK',
+  intents: [G.Guilds, G.GuildMessages, G.GuildVoiceStates, G.DirectMessages, G.MessageContent],
+  partials: [Partials.Channel],
+  commands: cmds
+});
 createDashboard(client, db, DEF);
 
+// دخول روم AFK الصوتي: إضافة الرتبة وطلب سبب الغياب بالخاص.
+client.on('voiceStateUpdate', safe(async (oldState, newState) => {
+  if (newState.guild.id !== AFK_GUILD_ID) return;
+  if (newState.channelId !== AFK_VOICE_CHANNEL_ID || oldState.channelId === AFK_VOICE_CHANNEL_ID) return;
+  const member = newState.member;
+  if (!member || member.user.bot) return;
+
+  const g = db.guild(newState.guild.id, DEF);
+  if (g.afk[member.id]) return;
+
+  const a = g.afk[member.id] = {
+    reason: 'بانتظار تحديد السبب',
+    since: Date.now(),
+    pings: [],
+    nick: member.nickname ?? null
+  };
+  await member.roles.add(AFK_ROLE_ID, 'CASS AFK: دخل روم الغياب').catch(() => {});
+  await setNick(member, true, g, a);
+  db.save();
+
+  pendingReasons.add(member.id);
+  await member.send({
+    embeds: [embed('💤 تم تفعيل AFK', 'وش سبب غيابك؟ اكتب السبب هنا بالخاص، وإذا أحد منشنك بنعلمه بسبب غيابك.')],
+  }).catch(() => {
+    pendingReasons.delete(member.id);
+  });
+}));
+
 client.on('messageCreate', safe(async msg => {
-  if (!msg.guild || msg.author.bot) return;
+  if (msg.author.bot) return;
+
+  // استقبال سبب الغياب من الخاص.
+  if (!msg.guild) {
+    if (!pendingReasons.has(msg.author.id)) return;
+    const g = db.guild(AFK_GUILD_ID, DEF);
+    const a = g.afk[msg.author.id];
+    if (!a) { pendingReasons.delete(msg.author.id); return; }
+    const reason = clean(msg.content);
+    if (!reason) return msg.reply('اكتب سبب الغياب برسالة نصية عشان أسجله لك.');
+    a.reason = reason;
+    pendingReasons.delete(msg.author.id);
+    db.save();
+    return msg.reply('✅ تم تسجيل سبب غيابك: **' + reason + '**');
+  }
+
+  if (!msg.guild) return;
   const g = db.guild(msg.guild.id, DEF);
   if (g.afk[msg.author.id] && !g.cfg.ignore.includes(msg.channelId) && Date.now() - g.afk[msg.author.id].since > 15e3)
     await back(msg.member, g, msg.channel);
